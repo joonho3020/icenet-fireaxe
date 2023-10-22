@@ -90,6 +90,8 @@ trait IceNicControllerBundle extends Bundle {
   val txcsumReq = Decoupled(new ChecksumRewriteRequest)
   val rxcsumRes = Flipped(Decoupled(new TCPChecksumOffloadResult))
   val csumEnable = Output(Bool())
+  val ddioRd = Input(new DDIOPerfCounter)
+  val ddioWr = Input(new DDIOPerfCounter)
 }
 
 trait IceNicControllerModule extends HasRegMap with HasNICParameters {
@@ -163,7 +165,12 @@ trait IceNicControllerModule extends HasRegMap with HasNICParameters {
     0x20 -> Seq(RegField(2, intMask)),
     0x28 -> Seq(RegField.w(49, txcsumReqQueue.io.enq)),
     0x30 -> Seq(RegField.r(2, rxcsumResQueue.io.deq)),
-    0x31 -> Seq(RegField(1, csumEnable)))
+    0x31 -> Seq(RegField(1, csumEnable)),
+    0x32 -> Seq(RegField.r(8, io.ddioRd.cycles)),
+    0x40 -> Seq(RegField.r(8, io.ddioRd.cnt)),
+    0x48 -> Seq(RegField.r(8, io.ddioWr.cycles)),
+    0x56 -> Seq(RegField.r(8, io.ddioWr.cnt))
+  )
 }
 
 case class IceNicControllerParams(address: BigInt, beatBytes: Int)
@@ -195,7 +202,10 @@ class IceNicSendPath(nInputTaps: Int = 0)(implicit p: Parameters)
         val req = Flipped(Decoupled(new ChecksumRewriteRequest))
         val enable = Input(Bool())
       })
+      val ddio = Output(new DDIOPerfCounter)
     })
+
+    io.ddio <> reader.module.io.ddio
 
     val readreq = reader.module.io.req
     io.send.req.ready := readreq.ready
@@ -258,7 +268,10 @@ class IceNicWriter(implicit p: Parameters) extends NICLazyModule {
       val recv = Flipped(new IceNicRecvIO)
       val in = Flipped(Decoupled(new StreamChannel(NET_IF_WIDTH)))
       val length = Flipped(Valid(UInt(NET_LEN_BITS.W)))
+      val ddio = Output(new DDIOPerfCounter)
     })
+
+    io.ddio <> writer.module.io.ddio
 
     val streaming = RegInit(false.B)
     val byteAddrBits = log2Ceil(NET_IF_BYTES)
@@ -482,6 +495,9 @@ class IceNIC(address: BigInt, beatBytes: Int = 8,
       control.module.io.rxcsumRes.valid := false.B
       control.module.io.rxcsumRes.bits := DontCare
     }
+
+    control.module.io.ddioRd <> sendPath.module.io.ddio
+    control.module.io.ddioWr <> recvPath.module.io.ddio
   }
 }
 

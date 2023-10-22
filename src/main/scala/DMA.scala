@@ -7,6 +7,12 @@ import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp, IdRange}
 import freechips.rocketchip.util.DecoupledHelper
 import freechips.rocketchip.tilelink._
 
+
+class DDIOPerfCounter extends Bundle {
+  val cycles = UInt(64.W)
+  val cnt    = UInt(64.W)
+}
+
 class StreamReadRequest extends Bundle {
   val address = UInt(48.W)
   val length = UInt(15.W)
@@ -27,6 +33,7 @@ class StreamReader(nXacts: Int, outFlits: Int, maxBytes: Int)
       val req = Flipped(Decoupled(new StreamReadRequest))
       val resp = Decoupled(Bool())
       val out = Decoupled(new StreamChannel(dataBits))
+      val ddio = Output(new DDIOPerfCounter)
     })
 
     core.module.io.req <> io.req
@@ -39,6 +46,8 @@ class StreamReader(nXacts: Int, outFlits: Int, maxBytes: Int)
     val aligner = Module(new Aligner(dataBits))
     aligner.io.in <> buffer.io.out
     io.out <> aligner.io.out
+
+    io.ddio <> core.module.io.ddio
   }
 }
 
@@ -63,6 +72,8 @@ class StreamReaderCore(nXacts: Int, outFlits: Int, maxBytes: Int)
       val resp = Decoupled(Bool())
       val alloc = Decoupled(new ReservationBufferAlloc(nXacts, outFlits))
       val out = Decoupled(new ReservationBufferData(nXacts, dataBits))
+
+      val ddio = Ouput(new DDIOPerfCounter)
     })
 
     val s_idle :: s_read :: s_resp :: Nil = Enum(3)
@@ -171,6 +182,39 @@ class StreamReaderCore(nXacts: Int, outFlits: Int, maxBytes: Int)
     when (io.resp.fire) {
       state := s_idle
     }
+
+    // NOTE : Currently maxBytes is set to 64 (cacheline size).
+    // Hence, each tl request does not perform cross-cacheline access.
+    val cycle = RegInit(0.U(64.W))
+    cycle := cycle + 1.U
+
+    val ddioWrLat = RegInit(0.U(64.W))
+    val ddioWrCnt = RegInit(0.U(64.W))
+    val xactStarts = Seq.fill(nXacts)(Module(new Queue(UInt(64.W), 4)))
+    for (i <- 0 until nXacts) {
+      xactStarts(i).io.enq.valid := false.B
+      xactStarts(i).io.enq.bits  := 0.U
+      xactStarts(i).io.deq.ready := false.B
+    }
+
+    for (i <- 0 until nXacts) {
+      xactStarts(i).io.enq.valid := tl.a.fire && (i.U === xactId)
+      xactStarts(i).io.enq.bits  := cycle
+      when (tl.a.fire && (i.U === xactId)) {
+        assert(xactStarts(i).io.enq.ready);
+      }
+    }
+
+    for (i <- 0 until nXacts) {
+      xactStarts(i).io.deq.ready := tl.d.fire && (i.U === tl.d.bits.source)
+      when (tl.d.fire && (i.U === tl.d.bits.source)) {
+        ddioWrLat := ddioWrLat + (cycle - xactStarts(i).io.deq.bits)
+        ddioWrCnt := ddioWrCnt + 1.U
+        assert(xactStarts(i).io.deq.valid)
+      }
+    }
+    io.ddio.cycles := ddioRdLat
+    io.ddio.cnt    := ddioRdCnt
   }
 }
 
@@ -199,6 +243,7 @@ class StreamWriter(nXacts: Int, maxBytes: Int)
       val req = Flipped(Decoupled(new StreamWriteRequest))
       val resp = Decoupled(UInt(lenBits.W))
       val in = Flipped(Decoupled(new StreamChannel(dataBits)))
+      val ddio = Output(new DDIOPerfCounter)
     })
 
     val s_idle :: s_data :: s_resp :: Nil = Enum(3)
@@ -296,5 +341,38 @@ class StreamWriter(nXacts: Int, maxBytes: Int)
     }
 
     when (io.resp.fire) { state := s_idle }
+
+    // NOTE : Currently maxBytes is set to 64 (cacheline size).
+    // Hence, each tl request does not perform cross-cacheline access.
+    val cycle = RegInit(0.U(64.W))
+    cycle := cycle + 1.U
+
+    val ddioRdLat = RegInit(0.U(64.W))
+    val ddioRdCnt = RegInit(0.U(64.W))
+    val xactStarts = Seq.fill(nXacts)(Module(new Queue(UInt(64.W), 4)))
+    for (i <- 0 until nXacts) {
+      xactStarts(i).io.enq.valid := false.B
+      xactStarts(i).io.enq.bits  := 0.U
+      xactStarts(i).io.deq.ready := false.B
+    }
+
+    for (i <- 0 until nXacts) {
+      xactStarts(i).io.enq.valid := tl.a.fire && (i.U === xactId)
+      xactStarts(i).io.enq.bits  := cycle
+      when (tl.a.fire && (i.U === xactId)) {
+        assert(xactStarts(i).io.enq.ready);
+      }
+    }
+
+    for (i <- 0 until nXacts) {
+      xactStarts(i).io.deq.ready := tl.d.fire && (i.U === tl.d.bits.source)
+      when (tl.d.fire && (i.U === tl.d.bits.source)) {
+        ddioRdLat := ddioRdLat + (cycle - xactStarts(i).io.deq.bits)
+        ddioRdCnt := ddioRdCnt + 1.U
+        assert(xactStarts(i).io.deq.valid)
+      }
+    }
+    io.ddio.cycles := ddioRdLat
+    io.ddio.cnt    := ddioRdCnt
   }
 }
