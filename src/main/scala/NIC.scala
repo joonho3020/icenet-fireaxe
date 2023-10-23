@@ -35,7 +35,7 @@ case class NICConfig(
   outBufFlits: Int = 2 * ETH_STANDARD_MAX_BYTES / NET_IF_BYTES,
   nMemXacts: Int = 8,
   maxAcquireBytes: Int = 64,
-  ctrlQueueDepth: Int = 10,
+  ctrlQueueDepth: Int = 100,
   usePauser: Boolean = false,
   checksumOffload: Boolean = false,
   packetMaxBytes: Int = ETH_STANDARD_MAX_BYTES)
