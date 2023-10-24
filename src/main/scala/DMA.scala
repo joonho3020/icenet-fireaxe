@@ -188,8 +188,8 @@ class StreamReaderCore(nXacts: Int, outFlits: Int, maxBytes: Int)
     val cycle = RegInit(0.U(64.W))
     cycle := cycle + 1.U
 
-    val ddioWrLat = RegInit(0.U(64.W))
-    val ddioWrCnt = RegInit(0.U(64.W))
+    val ddioRdLat = RegInit(0.U(64.W))
+    val ddioRdCnt = RegInit(0.U(64.W))
     val xactStarts = Seq.fill(nXacts)(Module(new Queue(UInt(64.W), 1)))
     for (i <- 0 until nXacts) {
       xactStarts(i).io.enq.valid := false.B
@@ -198,19 +198,19 @@ class StreamReaderCore(nXacts: Int, outFlits: Int, maxBytes: Int)
     }
 
     for (i <- 0 until nXacts) {
-      xactStarts(i).io.enq.valid := tl.a.fire && (i.U === xactId)
+      xactStarts(i).io.enq.valid := tl.a.fire && (i.U === tl.a.bits.source)
       xactStarts(i).io.enq.bits  := cycle
     }
 
     for (i <- 0 until nXacts) {
       xactStarts(i).io.deq.ready := tl.d.fire && (i.U === tl.d.bits.source)
       when (tl.d.fire && (i.U === tl.d.bits.source) && xactStarts(i).io.deq.valid) {
-        ddioWrLat := ddioWrLat + (cycle - xactStarts(i).io.deq.bits)
-        ddioWrCnt := ddioWrCnt + 1.U
+        ddioRdLat := ddioRdLat + (cycle - xactStarts(i).io.deq.bits)
+        ddioRdCnt := ddioRdCnt + 1.U
       }
     }
-    io.ddio.cycles := ddioWrLat
-    io.ddio.cnt    := ddioWrCnt
+    io.ddio.cycles := ddioRdLat
+    io.ddio.cnt    := ddioRdCnt
   }
 }
 
@@ -343,9 +343,9 @@ class StreamWriter(nXacts: Int, maxBytes: Int)
     val cycle = RegInit(0.U(64.W))
     cycle := cycle + 1.U
 
-    val ddioRdLat = RegInit(0.U(64.W))
-    val ddioRdCnt = RegInit(0.U(64.W))
-    val xactStarts = Seq.fill(nXacts)(Module(new Queue(UInt(64.W), 4)))
+    val ddioWrLat = RegInit(0.U(64.W))
+    val ddioWrCnt = RegInit(0.U(64.W))
+    val xactStarts = Seq.fill(nXacts)(Module(new Queue(UInt(64.W), 1)))
     for (i <- 0 until nXacts) {
       xactStarts(i).io.enq.valid := false.B
       xactStarts(i).io.enq.bits  := 0.U
@@ -353,18 +353,18 @@ class StreamWriter(nXacts: Int, maxBytes: Int)
     }
 
     for (i <- 0 until nXacts) {
-      xactStarts(i).io.enq.valid := tl.a.fire && (i.U === xactId)
+      xactStarts(i).io.enq.valid := tl.a.fire && (i.U === tl.a.bits.source)
       xactStarts(i).io.enq.bits  := cycle
     }
 
     for (i <- 0 until nXacts) {
       xactStarts(i).io.deq.ready := tl.d.fire && (i.U === tl.d.bits.source)
       when (tl.d.fire && (i.U === tl.d.bits.source) && xactStarts(i).io.deq.valid) {
-        ddioRdLat := ddioRdLat + (cycle - xactStarts(i).io.deq.bits)
-        ddioRdCnt := ddioRdCnt + 1.U
+        ddioWrLat := ddioWrLat + (cycle - xactStarts(i).io.deq.bits)
+        ddioWrCnt := ddioWrCnt + 1.U
       }
     }
-    io.ddio.cycles := ddioRdLat
-    io.ddio.cnt    := ddioRdCnt
+    io.ddio.cycles := ddioWrLat
+    io.ddio.cnt    := ddioWrCnt
   }
 }
