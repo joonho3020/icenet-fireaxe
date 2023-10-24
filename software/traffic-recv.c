@@ -9,7 +9,7 @@
 #include "encoding.h"
 
 
-#define NO_NET_DEBUG
+/* #define NO_NET_DEBUG */
 #define TRAFFIC_RECV_DEBUG
 
 #define N_CORES 8

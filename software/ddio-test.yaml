@@ -1,0 +1,14 @@
+{
+  "name": "ddio-test",
+  "base": "bare-base.json",
+  "jobs" : [
+    {
+      "name" : "0",
+      "bin": "traffic-gen.riscv"
+    },
+    {
+      "name" : "1",
+      "bin": "traffic-recv.riscv"
+    }
+  ]
+}
