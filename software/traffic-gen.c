@@ -22,11 +22,11 @@
 
 
 void gen_traffic(int core_id) {
-  uint8_t* src[TX_DESC_CNT];
+  uint8_t* tx_desc[TX_DESC_CNT];
   for (int i = 0; i < TX_DESC_CNT; i++) {
-    src[i] = (uint8_t*)malloc(sizeof(uint8_t) * PACKET_BYTES_PADDED);
+    tx_desc[i] = (uint8_t*)malloc(sizeof(uint8_t) * PACKET_BYTES_PADDED);
     for (int j = 0; j < TX_DESC_CNT; j++) {
-      src[i][j] = i * TX_DESC_CNT + j;
+      tx_desc[i][j] = i * TX_DESC_CNT + j;
     }
   }
 
@@ -37,7 +37,7 @@ void gen_traffic(int core_id) {
   uint64_t packets[TX_DESC_CNT];
   bool sent[TX_DESC_CNT];
   for (int i = 0; i < TX_DESC_CNT; i++) {
-    uint64_t pkt_addr = (uint64_t)&src[i][0];
+    uint64_t pkt_addr = (uint64_t)&tx_desc[i][0];
     uint64_t pkt_size = (uint64_t)PACKET_BYTES;
     uint64_t pkt = (pkt_size << 48) | pkt_addr;
     packets[i] = pkt;
@@ -77,9 +77,9 @@ void gen_traffic(int core_id) {
 }
 
 void recv_traffic(int core_id) {
-  uint8_t* dst[RX_DESC_CNT];
+  uint8_t* rx_desc[RX_DESC_CNT];
   for (int i = 0; i < RX_DESC_CNT; i++) {
-    dst[i] = (uint8_t*)malloc(sizeof(uint8_t) * PACKET_BYTES_PADDED);
+    rx_desc[i] = (uint8_t*)malloc(sizeof(uint8_t) * PACKET_BYTES_PADDED);
   }
 
 #ifdef TRAFFIC_GEN_DEBUG_PRINT
@@ -89,7 +89,7 @@ void recv_traffic(int core_id) {
 #ifndef NO_NIC_DEBUG
   do {
     for (int i = 0; i < RX_DESC_CNT; i++) {
-      nic_set_recv_addr(core_id, (uint64_t)dst[i]);
+      nic_set_recv_addr(core_id, (uint64_t)rx_desc[i]);
     }
 
     int recv_comps_left = RX_DESC_CNT;

@@ -2,3 +2,5 @@
 target
 *.so
 *.o
+*.riscv
+*.dump
