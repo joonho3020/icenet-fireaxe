@@ -21,7 +21,7 @@ nic-loopback.o: nic-loopback.c nic.h nic-rss.h mmio.h marchid.h encoding.h
 nic-loopback-rss.o: nic-loopback-rss.c nic.h nic-rss.h mmio.h marchid.h encoding.h
 	$(RISCV_CXX) $(RISCV_CFLAGS) -o $@ -c $<
 
-traffic-gen.o: traffic-gen.c nic-rss.h mmio.h marchid.h encoding.h
+traffic-gen.o: traffic-gen.c nic-rss.h mmio.h marchid.h encoding.h dslib.h
 	$(RISCV_CXX) $(RISCV_CFLAGS) -o $@ -c $<
 
 traffic-recv.o: traffic-recv.c nic-rss.h mmio.h marchid.h encoding.h

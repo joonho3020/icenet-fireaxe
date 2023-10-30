@@ -23,4 +23,30 @@ static void __attribute__((noinline)) barrier(int nCores)
 }
 
 
+static volatile int TICKET;
+static volatile int TURN;
+
+static int __attribute__((noinline)) acquire_lock() {
+  static __thread int myturn;
+
+  __sync_synchronize();
+  myturn = __sync_fetch_and_add(&TICKET, 1);
+
+  if (myturn == TURN) {
+    // Acquire lock
+  } else {
+    // Spin until my turn comes
+    while (myturn != TURN)
+      ;
+  }
+  __sync_synchronize();
+}
+
+static int __attribute((noinline)) release_lock() {
+  __sync_synchronize();
+  __sync_fetch_and_add(&TURN, 1);
+  __sync_synchronize();
+}
+
+
 #endif //__MT_UTILS_H__
