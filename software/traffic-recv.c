@@ -13,7 +13,7 @@
 #define TRAFFIC_RECV_DEBUG
 
 #define N_CORES 8
-#define RUN_CORES 4
+#define RUN_CORES 1
 #define TX_DESC_CNT 128
 #define RX_DESC_CNT 128
 #define PACKET_BYTES 1500
@@ -41,9 +41,15 @@ void forward_traffic(int core_id) {
   int tx_id = 0;
   int cnt = 0;
   do {
-    nic_recv((void*)rx_desc[rx_id], core_id);
+    int len = nic_recv((void*)rx_desc[rx_id], core_id);
+#ifdef TRAFFIC_RECV_DEBUG
+    printf("Received %d Bytes\n", len);
+#endif
     memcpy((void*)tx_desc[tx_id], (void*)rx_desc[rx_id], sizeof(uint8_t)*PACKET_BYTES);
     nic_send((void*)tx_desc[tx_id], PACKET_BYTES, core_id);
+#ifdef TRAFFIC_RECV_DEBUG
+    printf("Sending %d Bytes\n", PACKET_BYTES);
+#endif
     rx_id = (rx_id + 1) % RX_DESC_CNT;
     tx_id = (tx_id + 1) % TX_DESC_CNT;
     cnt ++;

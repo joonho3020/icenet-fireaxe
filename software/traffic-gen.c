@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <inttypes.h>
+#include <assert.h>
 
 
 #include "mmio.h"
@@ -9,16 +11,71 @@
 #include "encoding.h"
 
 
-#define TX_CORES 2
-#define RX_CORES 2
-#define TX_DESC_CNT 128
-#define RX_DESC_CNT 128
-#define PACKET_BYTES 1500
+#define TX_CORES 1
+#define RX_CORES 1
+#define TX_DESC_CNT 10
+#define RX_DESC_CNT 10
+#define PACKET_BYTES 1424
 #define PACKET_BYTES_PADDED (PACKET_BYTES+8)
 
 
 #define TRAFFIC_GEN_DEBUG_PRINT
 /* #define NO_NIC_DEBUG */
+
+
+#define SUCCESS 0
+#define FAIL -1
+
+typedef struct Queue {
+  int* data;
+  int head;
+  int tail;
+  int size;
+  int full;
+} Queue;
+
+Queue* newQueue(int size) {
+  Queue* q = (Queue*)malloc(sizeof(Queue));
+  q->data = (int*)malloc(sizeof(int) * size);
+  q->head = 0;
+  q->tail = 0;
+  q->size = size;
+  q->full = 0;
+};
+
+void freeQueue(Queue* q) {
+  free(q->data);
+  free(q);
+}
+
+int enqueue(Queue* q, int entry) {
+  if (q->full) return FAIL;
+  q->data[q->tail] = entry;
+  q->tail = (q->tail + 1) % q->size;
+  if (q->tail == q->head) q->full = 1;
+  return SUCCESS;
+}
+
+int isempty(Queue *q) {
+  return !q->full && (q->tail == q->head);
+}
+
+int size(Queue *q) {
+  if (q->full) return q->size;
+  if (q->tail >= q->head) return q->tail - q->head;
+  else return (q->size + 1 - q->head + q->tail);
+}
+
+int space(Queue *q) {
+  return q->size - size(q);
+}
+
+int dequeue(Queue *q) {
+  assert(!isempty(q));
+  int ret = q->data[q->head];
+  q->head = (q->head + 1) % q->size;
+  return ret;
+}
 
 
 void gen_traffic(int core_id) {
@@ -35,45 +92,51 @@ void gen_traffic(int core_id) {
 #endif
 
   uint64_t packets[TX_DESC_CNT];
-  bool sent[TX_DESC_CNT];
+  Queue* pending = newQueue(TX_DESC_CNT);
+  Queue* inflight = newQueue(TX_DESC_CNT);
   for (int i = 0; i < TX_DESC_CNT; i++) {
     uint64_t pkt_addr = (uint64_t)&tx_desc[i][0];
     uint64_t pkt_size = (uint64_t)PACKET_BYTES;
     uint64_t pkt = (pkt_size << 48) | pkt_addr;
     packets[i] = pkt;
-    sent[i] = false;
+    enqueue(pending, i);
   }
 
 
-#ifndef NO_NIC_DEBUG
   do {
-    int cnt = 0;
-    for (int i = 0; i < TX_DESC_CNT; i++) {
-      if (!sent[i]) {
-        nic_send_req(core_id, packets[i]);
-        sent[i] = true;
-        cnt++;
-      }
-    }
-#ifdef TRAFFIC_GEN_DEBUG_PRINT
-    fprintf(stdout, "Core %d sending %d packets\n", core_id, cnt);
+    printf("space(pending): %d\n", space(pending));
+    for (int i = 0; i < size(pending); i++) {
+      int pidx = dequeue(pending);
+      fprintf(stdout, "pending.deq: %d\n", pidx);
+#ifndef NO_NIC_DEBUG
+      nic_send_req(core_id, packets[pidx]);
 #endif
+      enqueue(inflight, pidx);
+    }
 
-    cnt = 0;
-    int ncomps = nic_send_comp_avail(core_id);
+    printf("space(inflight): %d size(inflight): %d\n", space(inflight), size(inflight));
+
+    int ncomps = 0;
+#ifndef NO_NIC_DEBUG
+    ncomps = nic_send_comp_avail(core_id);
+/* fprintf(stdout, "Core %d sending %d completions\n", core_id, ncomps); */
+#endif
     asm volatile("fence");
-#ifdef TRAFFIC_GEN_DEBUG_PRINT
-    fprintf(stdout, "Core %d sending %d completions\n", core_id, ncomps);
+#ifndef NO_NIC_DEBUG
+    for (int i = 0; i < ncomps; i++) {
+#else
+    for (int i = 0; i < size(inflight); i++) {
 #endif
-    for (int i = 0; i < TX_DESC_CNT && cnt < ncomps; i++) {
-      if (sent[i]) {
-        nic_send_comp(core_id);
-        sent[i] = false;
-        cnt++;
-      }
+      assert(!isempty(inflight));
+      int pidx = dequeue(inflight);
+      printf("inflight.deq: %d\n", pidx);
+      enqueue(pending, pidx);
+#ifndef NO_NIC_DEBUG
+      nic_send_comp(core_id);
+      fprintf(stdout, "nic_send_comp %d\n", pidx);
+#endif
     }
-  } while (1);
-#endif
+  } while (0);
 }
 
 void recv_traffic(int core_id) {
@@ -113,11 +176,11 @@ void __main(void) {
 
   if (mhartid >= TX_CORES + RX_CORES) while (1);
 
-  for (int i = TX_CORES; i < TX_CORES + RX_CORES; i++) {
-    if (mhartid == i) {
-      recv_traffic(mhartid);
-    }
-  }
+/* for (int i = TX_CORES; i < TX_CORES + RX_CORES; i++) { */
+/* if (mhartid == i) { */
+/* recv_traffic(mhartid); */
+/* } */
+/* } */
 
   for (int i = 0; i < TX_CORES; i++) {
     if (mhartid == i) {
@@ -132,3 +195,4 @@ int main(void) {
   __main();
   return 0;
 }
+

@@ -12,7 +12,8 @@ LD_FLAGS = -static -specs=htif_nano.specs
 default: nic-loopback.riscv nic-loopback.dump \
 	nic-loopback-rss.riscv nic-loopback-rss.dump \
 	traffic-gen.riscv traffic-gen.dump \
-	traffic-recv.riscv traffic-recv.dump
+	traffic-recv.riscv traffic-recv.dump \
+	dummy.riscv
 
 nic-loopback.o: nic-loopback.c nic.h nic-rss.h mmio.h marchid.h encoding.h
 	$(RISCV_CXX) $(RISCV_CFLAGS) -o $@ -c $<
@@ -24,6 +25,9 @@ traffic-gen.o: traffic-gen.c nic-rss.h mmio.h marchid.h encoding.h
 	$(RISCV_CXX) $(RISCV_CFLAGS) -o $@ -c $<
 
 traffic-recv.o: traffic-recv.c nic-rss.h mmio.h marchid.h encoding.h
+	$(RISCV_CXX) $(RISCV_CFLAGS) -o $@ -c $<
+
+dummy.o: dummy.c
 	$(RISCV_CXX) $(RISCV_CFLAGS) -o $@ -c $<
 
 %.riscv: %.o
