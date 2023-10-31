@@ -1,4 +1,4 @@
 #!/bin/bash
 
 make clean && make
-mv traffic-*.riscv ddio-test
+cp traffic-*.riscv ddio-test

@@ -14,7 +14,7 @@
 #define TRAFFIC_RECV_DEBUG
 
 #define N_CORES 12
-#define RUN_CORES 4
+#define RUN_CORES 10
 #define TX_DESC_CNT 128
 #define RX_DESC_CNT 128
 #define PACKET_BYTES 1500
@@ -37,7 +37,6 @@ void forward_traffic(int core_id) {
 
     // touch pages to prevent page faults?
     for (int j = 0; j < PACKET_BYTES_PADDED; j += PAGESIZE_BYTES) {
-/* printf("%d\n", __LINE__); */
       rx_desc[i][j] = 0;
     }
     enqueue(rx_idx, i);
@@ -50,7 +49,6 @@ void forward_traffic(int core_id) {
 
     // touch pages to prevent page faults
     for (int j = 0; j < PACKET_BYTES_PADDED; j += PAGESIZE_BYTES) {
-/* printf("%d\n", __LINE__); */
       tx_desc[i][j] = 0;
     }
     enqueue(tx_idx, i);
