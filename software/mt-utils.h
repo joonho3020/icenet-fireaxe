@@ -22,6 +22,20 @@ static void __attribute__((noinline)) barrier(int nCores)
   __sync_synchronize();
 }
 
+static void __attribute__((noinline)) syncpoint(int nCores)
+{
+  static volatile int count;
+
+  __sync_synchronize();
+
+  if (__sync_fetch_and_add(&count, 1) != nCores-1) {
+    while (count != nCores - 1)
+      ;
+  }
+
+  __sync_synchronize();
+}
+
 
 static volatile int TICKET;
 static volatile int TURN;

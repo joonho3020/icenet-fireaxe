@@ -19,6 +19,7 @@
 
 
 #define TRAFFIC_GEN_DEBUG_PRINT
+#define START_CYCLE 1000000
 /* #define NO_NIC_DEBUG */
 
 
@@ -33,7 +34,9 @@ void gen_traffic(int core_id) {
   }
 
 #ifdef TRAFFIC_GEN_DEBUG_PRINT
+  acquire_lock();
   fprintf(stdout, "Core %d finished memory setup for TX DESC\n", core_id);
+  release_lock();
 #endif
 
   uint64_t packets[TX_DESC_CNT];
@@ -47,6 +50,10 @@ void gen_traffic(int core_id) {
     enqueue(pending, i);
   }
 
+  uint64_t cycle;
+  do {
+    cycle = rdcycle();
+  } while (cycle < START_CYCLE);
 
   do {
     for (int i = 0; i < size(pending); i++) {

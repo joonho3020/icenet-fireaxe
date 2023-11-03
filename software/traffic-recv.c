@@ -14,7 +14,7 @@
 #define TRAFFIC_RECV_DEBUG
 
 #define N_CORES 12
-#define RUN_CORES 10
+#define RUN_CORES 4
 #define TX_DESC_CNT 128
 #define RX_DESC_CNT 128
 #define PACKET_BYTES 1500
@@ -33,10 +33,10 @@ void forward_traffic(int core_id) {
   // setup rx desc
   rx_idx = newQueue(RX_DESC_CNT);
   for (int i = 0; i < RX_DESC_CNT; i++) {
-    rx_desc[i] = (uint8_t*)malloc(sizeof(uint8_t) * PACKET_BYTES_PADDED);
+    rx_desc[i] = (uint8_t*)memalign(PAGESIZE_BYTES, sizeof(uint8_t) * PACKET_BYTES_PADDED);
 
     // touch pages to prevent page faults?
-    for (int j = 0; j < PACKET_BYTES_PADDED; j += PAGESIZE_BYTES) {
+    for (int j = 0; j < PAGESIZE_BYTES; j++) {
       rx_desc[i][j] = 0;
     }
     enqueue(rx_idx, i);
@@ -45,10 +45,10 @@ void forward_traffic(int core_id) {
   // setup tx desc
   tx_idx = newQueue(TX_DESC_CNT);
   for (int i = 0; i < TX_DESC_CNT; i++) {
-    tx_desc[i] = (uint8_t*)malloc(sizeof(uint8_t) * PACKET_BYTES_PADDED);
+    tx_desc[i] = (uint8_t*)memalign(PAGESIZE_BYTES, sizeof(uint8_t) * PACKET_BYTES_PADDED);
 
     // touch pages to prevent page faults
-    for (int j = 0; j < PACKET_BYTES_PADDED; j += PAGESIZE_BYTES) {
+    for (int j = 0; j < PAGESIZE_BYTES; j++) {
       tx_desc[i][j] = 0;
     }
     enqueue(tx_idx, i);
@@ -56,6 +56,8 @@ void forward_traffic(int core_id) {
 
   fprintf(stdout, "Core %d start forwarding traffic\n", core_id);
   release_lock();
+
+  syncpoint(RUN_CORES);
 
   Queue* inflight_rx = newQueue(RX_DESC_CNT);
 
@@ -83,7 +85,7 @@ void forward_traffic(int core_id) {
 
     acquire_lock();
     if (cnt - prev_cnt > 1000) {
-      printf("core: %d inflight: %d cnt: %d\n", core_id, size(inflight_rx), cnt);
+      printf("core %d cnt %d\n", core_id, cnt);
 #ifndef NO_NET_DEBUG
       if (core_id == 0) {
         printf("rd: %d wr: %d\n", (int)nic_ddio_rd_avg_lat(N_CORES), (int)nic_ddio_wr_avg_lat(N_CORES));
@@ -128,6 +130,10 @@ void forward_traffic(int core_id) {
       cnt++;
     }
   } while (cnt < MAX_PACKETS_TO_FORWARD);
+
+  acquire_lock();
+  printf("Core %d done forwarding\n", core_id);
+  release_lock();
 }
 
 
