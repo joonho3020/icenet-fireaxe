@@ -19,47 +19,36 @@
 #define RX_DESC_CNT 128
 #define PACKET_BYTES 1500
 #define PACKET_BYTES_PADDED (PACKET_BYTES+8)
-#define MAX_PACKETS_TO_FORWARD (50000 / RUN_CORES)
+#define MAX_PACKETS_TO_FORWARD (10000 / RUN_CORES)
 #define PAGESIZE_BYTES 4096
 
+uint8_t rx_desc[RUN_CORES][RX_DESC_CNT][PACKET_BYTES_PADDED];
+uint8_t tx_desc[RUN_CORES][RX_DESC_CNT][PACKET_BYTES_PADDED];
 
 void forward_traffic(int core_id) {
   acquire_lock();
   Queue* rx_idx;
-  uint8_t* rx_desc[RX_DESC_CNT];
   Queue* tx_idx;
-  uint8_t* tx_desc[TX_DESC_CNT];
+  Queue* inflight_rx;
 
   // setup rx desc
   rx_idx = newQueue(RX_DESC_CNT);
   for (int i = 0; i < RX_DESC_CNT; i++) {
-    rx_desc[i] = (uint8_t*)memalign(PAGESIZE_BYTES, sizeof(uint8_t) * PACKET_BYTES_PADDED);
-
-    // touch pages to prevent page faults?
-    for (int j = 0; j < PAGESIZE_BYTES; j++) {
-      rx_desc[i][j] = 0;
-    }
     enqueue(rx_idx, i);
   }
 
   // setup tx desc
   tx_idx = newQueue(TX_DESC_CNT);
   for (int i = 0; i < TX_DESC_CNT; i++) {
-    tx_desc[i] = (uint8_t*)memalign(PAGESIZE_BYTES, sizeof(uint8_t) * PACKET_BYTES_PADDED);
-
-    // touch pages to prevent page faults
-    for (int j = 0; j < PAGESIZE_BYTES; j++) {
-      tx_desc[i][j] = 0;
-    }
     enqueue(tx_idx, i);
   }
+
+  inflight_rx = newQueue(RX_DESC_CNT);
 
   fprintf(stdout, "Core %d start forwarding traffic\n", core_id);
   release_lock();
 
   syncpoint(RUN_CORES);
-
-  Queue* inflight_rx = newQueue(RX_DESC_CNT);
 
   int cnt = 0, prev_cnt = 0;
   int recv_avail, send_avail;
@@ -74,11 +63,11 @@ void forward_traffic(int core_id) {
     recv_avail = RX_DESC_CNT;
 #endif
     for (int i = 0; i < recv_avail; i++) {
-      if (!isempty(rx_idx)) {
+      if (!isempty(rx_idx) && (space(inflight_rx) > 0)) {
         rid = dequeue(rx_idx);
         enqueue(inflight_rx, rid);
 #ifndef NO_NET_DEBUG
-        nic_set_recv_addr(core_id, (uint64_t)rx_desc[rid]);
+        nic_set_recv_addr(core_id, (uint64_t)rx_desc[core_id][rid]);
 #endif
       }
     }
@@ -100,6 +89,9 @@ void forward_traffic(int core_id) {
     int recv_comps = nic_recv_comp_avail(core_id);
     asm volatile("fence");
     assert(recv_comps <= size(inflight_rx));
+/* acquire_lock(); */
+/* printf("recv: %d, ifrx: %d\n", recv_comps, size(inflight_rx)); */
+/* release_lock(); */
 #else
     int recv_comps = size(inflight_rx);
 #endif
@@ -111,18 +103,18 @@ void forward_traffic(int core_id) {
 
       // Copy the rx descriptor to the tx descriptor
       assert(!isempty(inflight_rx));
-      assert(space(rx_idx) > 0);
-      assert(!isempty(tx_idx));
+/* assert(space(rx_idx) > 0); */
+/* assert(!isempty(tx_idx)); */
 
       rid = dequeue(inflight_rx);
       enqueue(rx_idx, rid);
 
       tid = dequeue(tx_idx);
-      memcpy((void*)tx_desc[tid], (void*)rx_desc[rid], sizeof(uint8_t)*PACKET_BYTES);
+      memcpy((void*)tx_desc[core_id][tid], (void*)rx_desc[core_id][rid], sizeof(uint8_t)*PACKET_BYTES);
 
       // Send the tx descriptor
 #ifndef NO_NET_DEBUG
-      nic_send((void*)tx_desc[tid], len, core_id);
+      nic_send((void*)tx_desc[core_id][tid], len, core_id);
 #endif
 
       // release the used tx descriptor

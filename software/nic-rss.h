@@ -54,6 +54,7 @@ static inline int nic_recv_comp(int id)
 static inline float nic_ddio_rd_avg_lat(int nc) {
   uint64_t cycles = reg_read64(SIMPLENIC_BASE + 24 * nc + 8);
   uint64_t req_cnt = reg_read64(SIMPLENIC_BASE + 24 * nc + 16);
+  asm volatile ("fence");
   if (req_cnt == 0)
     return -1;
   else
@@ -63,6 +64,7 @@ static inline float nic_ddio_rd_avg_lat(int nc) {
 static inline float nic_ddio_wr_avg_lat(int nc) {
   uint64_t cycles = reg_read64(SIMPLENIC_BASE + 24 * nc + 24);
   uint64_t req_cnt = reg_read64(SIMPLENIC_BASE + 24 * nc + 32);
+  asm volatile ("fence");
   if (req_cnt == 0)
     return -1;
   else
