@@ -253,10 +253,10 @@ trait IceNicControllerModule extends HasRegMap with HasNICParameters {
   addrMap.append((base + 0x20) -> Seq(RegField.r(64, io.ddioWr.cnt)))
 
   for (i <- 0 until 16) {
-    addrMap.append((base + 0x20 + i*8) -> Seq(RegField.r(64, io.ddioRd.hist(i))))
+    addrMap.append((base + 0x28 + i*8) -> Seq(RegField.r(64, io.ddioRd.hist(i))))
   }
   for (i <- 0 until 16) {
-    addrMap.append((base + 0x20 + 16*8 + i*8) -> Seq(RegField.r(64. io.ddioWr.hist(i))))
+    addrMap.append((base + 0x28 + 16*8 + i*8) -> Seq(RegField.r(64, io.ddioWr.hist(i))))
   }
 
   txcsumReqQueue.io.enq.valid := false.B

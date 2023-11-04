@@ -198,6 +198,7 @@ class StreamReaderCore(nXacts: Int, outFlits: Int, maxBytes: Int)
     val ddioRdHist = Seq.fill(16)(RegInit(0.U(64.W)))
 
     val ddioRdLat = RegInit(0.U(64.W))
+    val ddioRdCnt = RegInit(0.U(64.W))
     val xactStarts = Seq.fill(nXacts)(Module(new Queue(UInt(64.W), 1)))
     for (i <- 0 until nXacts) {
       xactStarts(i).io.enq.valid := false.B

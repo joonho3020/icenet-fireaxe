@@ -12,26 +12,25 @@
 #include "dslib.h"
 
 
-#define TX_CORES 2
+#define TX_CORES 1
 #define TX_DESC_CNT 100
 #define PACKET_BYTES 1424
 #define PACKET_BYTES_PADDED (PACKET_BYTES+8)
 
 
 #define TRAFFIC_GEN_DEBUG_PRINT
-#define START_CYCLE 1000000
+#define START_CYCLE 100
 /* #define NO_NIC_DEBUG */
 
 
+uint8_t tx_desc[TX_CORES][TX_DESC_CNT][PACKET_BYTES_PADDED];
 
 void gen_traffic(int core_id) {
-  uint8_t* tx_desc[TX_DESC_CNT];
-  for (int i = 0; i < TX_DESC_CNT; i++) {
-    tx_desc[i] = (uint8_t*)malloc(sizeof(uint8_t) * PACKET_BYTES_PADDED);
-    for (int j = 0; j < TX_DESC_CNT; j++) {
-      tx_desc[i][j] = i * TX_DESC_CNT + j;
-    }
-  }
+/* for (int i = 0; i < TX_DESC_CNT; i++) { */
+/* for (int j = 0; j < PACKET_BYTES_PADDED; j++) { */
+/* tx_desc[core_id][i][j] = i * TX_DESC_CNT + j; */
+/* } */
+/* } */
 
 #ifdef TRAFFIC_GEN_DEBUG_PRINT
   acquire_lock();
@@ -59,7 +58,6 @@ void gen_traffic(int core_id) {
     for (int i = 0; i < size(pending); i++) {
       int pidx = dequeue(pending);
 #ifndef NO_NIC_DEBUG
-/* fprintf(stdout, "pending.deq: %d\n", pidx); */
       nic_send_req(core_id, packets[pidx]);
 #endif
       enqueue(inflight, pidx);
@@ -82,7 +80,6 @@ void gen_traffic(int core_id) {
       enqueue(pending, pidx);
 #ifndef NO_NIC_DEBUG
       nic_send_comp(core_id);
-/* fprintf(stdout, "nic_send_comp %d\n", pidx); */
 #endif
     }
   } while (1);

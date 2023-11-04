@@ -13,13 +13,13 @@
 /* #define NO_NET_DEBUG */
 #define TRAFFIC_RECV_DEBUG
 
-#define N_CORES 12
-#define RUN_CORES 4
+#define N_CORES 1
+#define RUN_CORES 1
 #define TX_DESC_CNT 128
 #define RX_DESC_CNT 128
 #define PACKET_BYTES 1500
 #define PACKET_BYTES_PADDED (PACKET_BYTES+8)
-#define MAX_PACKETS_TO_FORWARD (10000 / RUN_CORES)
+#define MAX_PACKETS_TO_FORWARD (100 / RUN_CORES)
 #define PAGESIZE_BYTES 4096
 
 uint8_t rx_desc[RUN_CORES][RX_DESC_CNT][PACKET_BYTES_PADDED];
@@ -89,9 +89,6 @@ void forward_traffic(int core_id) {
     int recv_comps = nic_recv_comp_avail(core_id);
     asm volatile("fence");
     assert(recv_comps <= size(inflight_rx));
-/* acquire_lock(); */
-/* printf("recv: %d, ifrx: %d\n", recv_comps, size(inflight_rx)); */
-/* release_lock(); */
 #else
     int recv_comps = size(inflight_rx);
 #endif
@@ -144,6 +141,8 @@ void __main(void) {
   if (mhartid > 0) while (1);
 #ifndef NO_NET_DEBUG
   fprintf(stdout, "rd: %d wr: %d\n", (int)nic_ddio_rd_avg_lat(N_CORES), (int)nic_ddio_wr_avg_lat(N_CORES));
+  print_nic_ddio_rd_hist(N_CORES);
+  print_nic_ddio_wr_hist(N_CORES);
 #endif
 }
 
