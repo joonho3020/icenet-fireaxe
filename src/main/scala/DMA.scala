@@ -11,6 +11,7 @@ import freechips.rocketchip.tilelink._
 class DDIOPerfCounter extends Bundle {
   val cycles = UInt(64.W)
   val cnt    = UInt(64.W)
+  val hist   = Vec(16, UInt(64.W))
 }
 
 class StreamReadRequest extends Bundle {
@@ -188,8 +189,15 @@ class StreamReaderCore(nXacts: Int, outFlits: Int, maxBytes: Int)
     val cycle = RegInit(0.U(64.W))
     cycle := cycle + 1.U
 
+
+    /*
+     * 0 : under 80
+     * 1 <= n <= 20 : 80 + 5n - 5 <= cycles < 80 + 5n
+     * 15 : over 185
+     */
+    val ddioRdHist = Seq.fill(16)(RegInit(0.U(64.W)))
+
     val ddioRdLat = RegInit(0.U(64.W))
-    val ddioRdCnt = RegInit(0.U(64.W))
     val xactStarts = Seq.fill(nXacts)(Module(new Queue(UInt(64.W), 1)))
     for (i <- 0 until nXacts) {
       xactStarts(i).io.enq.valid := false.B
@@ -205,12 +213,48 @@ class StreamReaderCore(nXacts: Int, outFlits: Int, maxBytes: Int)
     for (i <- 0 until nXacts) {
       xactStarts(i).io.deq.ready := tl.d.fire && (i.U === tl.d.bits.source)
       when (tl.d.fire && (i.U === tl.d.bits.source) && xactStarts(i).io.deq.valid) {
-        ddioRdLat := ddioRdLat + (cycle - xactStarts(i).io.deq.bits)
+        val a2d_cycles = cycle - xactStarts(i).io.deq.bits
+
+        when (a2d_cycles < 80.U) {
+          ddioRdHist(0) := ddioRdHist(0) + 1.U
+        } .elsewhen ((80.U <= a2d_cycles) && (a2d_cycles < 85.U)) {
+          ddioRdHist(1) := ddioRdHist(1) + 1.U
+        } .elsewhen ((85.U <= a2d_cycles) && (a2d_cycles < 90.U)) {
+          ddioRdHist(2) := ddioRdHist(2) + 1.U
+        } .elsewhen ((90.U <= a2d_cycles) && (a2d_cycles < 95.U)) {
+          ddioRdHist(3) := ddioRdHist(3) + 1.U
+        } .elsewhen ((95.U <= a2d_cycles) && (a2d_cycles < 100.U)) {
+          ddioRdHist(4) := ddioRdHist(4) + 1.U
+        } .elsewhen ((105.U <= a2d_cycles) && (a2d_cycles < 110.U)) {
+          ddioRdHist(5) := ddioRdHist(5) + 1.U
+        } .elsewhen ((110.U <= a2d_cycles) && (a2d_cycles < 115.U)) {
+          ddioRdHist(6) := ddioRdHist(6) + 1.U
+        } .elsewhen ((115.U <= a2d_cycles) && (a2d_cycles < 120.U)) {
+          ddioRdHist(7) := ddioRdHist(7) + 1.U
+        } .elsewhen ((120.U <= a2d_cycles) && (a2d_cycles < 125.U)) {
+          ddioRdHist(8) := ddioRdHist(8) + 1.U
+        } .elsewhen ((125.U <= a2d_cycles) && (a2d_cycles < 130.U)) {
+          ddioRdHist(9) := ddioRdHist(9) + 1.U
+        } .elsewhen ((130.U <= a2d_cycles) && (a2d_cycles < 135.U)) {
+          ddioRdHist(10) := ddioRdHist(10) + 1.U
+        } .elsewhen ((135.U <= a2d_cycles) && (a2d_cycles < 140.U)) {
+          ddioRdHist(11) := ddioRdHist(11) + 1.U
+        } .elsewhen ((140.U <= a2d_cycles) && (a2d_cycles < 145.U)) {
+          ddioRdHist(12) := ddioRdHist(12) + 1.U
+        } .elsewhen ((145.U <= a2d_cycles) && (a2d_cycles < 150.U)) {
+          ddioRdHist(13) := ddioRdHist(13) + 1.U
+        } .elsewhen ((150.U <= a2d_cycles) && (a2d_cycles < 155.U)) {
+          ddioRdHist(14) := ddioRdHist(14) + 1.U
+        } .otherwise {
+          ddioRdHist(15) := ddioRdHist(15) + 1.U
+        }
+        ddioRdLat := ddioRdLat + a2d_cycles
         ddioRdCnt := ddioRdCnt + 1.U
       }
     }
     io.ddio.cycles := ddioRdLat
     io.ddio.cnt    := ddioRdCnt
+    io.ddio.hist   := ddioRdHist
   }
 }
 
@@ -343,6 +387,13 @@ class StreamWriter(nXacts: Int, maxBytes: Int)
     val cycle = RegInit(0.U(64.W))
     cycle := cycle + 1.U
 
+    /*
+     * 0 : under 80
+     * 1 <= n <= 20 : 80 + 5n - 5 <= cycles < 80 + 5n
+     * 15 : over 185
+     */
+    val ddioWrHist = Seq.fill(16)(RegInit(0.U(64.W)))
+
     val ddioWrLat = RegInit(0.U(64.W))
     val ddioWrCnt = RegInit(0.U(64.W))
     val xactStarts = Seq.fill(nXacts)(Module(new Queue(UInt(64.W), 1)))
@@ -360,11 +411,47 @@ class StreamWriter(nXacts: Int, maxBytes: Int)
     for (i <- 0 until nXacts) {
       xactStarts(i).io.deq.ready := tl.d.fire && (i.U === tl.d.bits.source)
       when (tl.d.fire && (i.U === tl.d.bits.source) && xactStarts(i).io.deq.valid) {
+        val a2d_cycles = (cycle - xactStarts(i).io.deq.bits)
+
+        when (a2d_cycles < 80.U) {
+          ddioWrHist(0) := ddioWrHist(0) + 1.U
+        } .elsewhen ((80.U <= a2d_cycles) && (a2d_cycles < 85.U)) {
+          ddioWrHist(1) := ddioWrHist(1) + 1.U
+        } .elsewhen ((85.U <= a2d_cycles) && (a2d_cycles < 90.U)) {
+          ddioWrHist(2) := ddioWrHist(2) + 1.U
+        } .elsewhen ((90.U <= a2d_cycles) && (a2d_cycles < 95.U)) {
+          ddioWrHist(3) := ddioWrHist(3) + 1.U
+        } .elsewhen ((95.U <= a2d_cycles) && (a2d_cycles < 100.U)) {
+          ddioWrHist(4) := ddioWrHist(4) + 1.U
+        } .elsewhen ((105.U <= a2d_cycles) && (a2d_cycles < 110.U)) {
+          ddioWrHist(5) := ddioWrHist(5) + 1.U
+        } .elsewhen ((110.U <= a2d_cycles) && (a2d_cycles < 115.U)) {
+          ddioWrHist(6) := ddioWrHist(6) + 1.U
+        } .elsewhen ((115.U <= a2d_cycles) && (a2d_cycles < 120.U)) {
+          ddioWrHist(7) := ddioWrHist(7) + 1.U
+        } .elsewhen ((120.U <= a2d_cycles) && (a2d_cycles < 125.U)) {
+          ddioWrHist(8) := ddioWrHist(8) + 1.U
+        } .elsewhen ((125.U <= a2d_cycles) && (a2d_cycles < 130.U)) {
+          ddioWrHist(9) := ddioWrHist(9) + 1.U
+        } .elsewhen ((130.U <= a2d_cycles) && (a2d_cycles < 135.U)) {
+          ddioWrHist(10) := ddioWrHist(10) + 1.U
+        } .elsewhen ((135.U <= a2d_cycles) && (a2d_cycles < 140.U)) {
+          ddioWrHist(11) := ddioWrHist(11) + 1.U
+        } .elsewhen ((140.U <= a2d_cycles) && (a2d_cycles < 145.U)) {
+          ddioWrHist(12) := ddioWrHist(12) + 1.U
+        } .elsewhen ((145.U <= a2d_cycles) && (a2d_cycles < 150.U)) {
+          ddioWrHist(13) := ddioWrHist(13) + 1.U
+        } .elsewhen ((150.U <= a2d_cycles) && (a2d_cycles < 155.U)) {
+          ddioWrHist(14) := ddioWrHist(14) + 1.U
+        } .otherwise {
+          ddioWrHist(15) := ddioWrHist(15) + 1.U
+        }
         ddioWrLat := ddioWrLat + (cycle - xactStarts(i).io.deq.bits)
         ddioWrCnt := ddioWrCnt + 1.U
       }
     }
     io.ddio.cycles := ddioWrLat
     io.ddio.cnt    := ddioWrCnt
+    io.ddio.hist   := ddioWrHist
   }
 }
