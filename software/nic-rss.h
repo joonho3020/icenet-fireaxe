@@ -1,4 +1,6 @@
 #include <stdint.h>
+#include <inttypes.h>
+#include <stdio.h>
 
 #define SIMPLENIC_BASE 0x10016000L
 #define SIMPLENIC_SEND_REQ_OFFSET  0
@@ -97,4 +99,18 @@ static int nic_recv(void *dest, int id)
   asm volatile ("fence");
 
   return len;
+}
+
+static void print_nic_ddio_rd_hist(int nc) {
+  for (int i = 0; i < 16; i++) {
+    uint64_t bin_cnt = reg_read64(SIMPLENIC_BASE + 24*nc + 40 + i*8);
+    printf("hist_rd[%d]: %" PRIu64 "\n", i, bin_cnt);
+  }
+}
+
+static void print_nic_ddio_wr_hist(int nc) {
+  for (int i = 0; i < 16; i++) {
+    uint64_t bin_cnt = reg_read64(SIMPLENIC_BASE + 24*nc + 40 + 16*8 + i*8);
+    printf("hist_wr[%d]: %" PRIu64 "\n", i, bin_cnt);
+  }
 }
