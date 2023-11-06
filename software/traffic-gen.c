@@ -12,7 +12,7 @@
 #include "dslib.h"
 
 
-#define TX_CORES 1
+/* #define TX_CORES 12 */
 #define TX_DESC_CNT 100
 #define PACKET_BYTES 1424
 #define PACKET_BYTES_PADDED (PACKET_BYTES+8)
@@ -26,12 +26,6 @@
 uint8_t tx_desc[TX_CORES][TX_DESC_CNT][PACKET_BYTES_PADDED];
 
 void gen_traffic(int core_id) {
-/* for (int i = 0; i < TX_DESC_CNT; i++) { */
-/* for (int j = 0; j < PACKET_BYTES_PADDED; j++) { */
-/* tx_desc[core_id][i][j] = i * TX_DESC_CNT + j; */
-/* } */
-/* } */
-
 #ifdef TRAFFIC_GEN_DEBUG_PRINT
   acquire_lock();
   fprintf(stdout, "Core %d finished memory setup for TX DESC\n", core_id);
@@ -62,8 +56,6 @@ void gen_traffic(int core_id) {
 #endif
       enqueue(inflight, pidx);
     }
-
-/* printf("space(inflight): %d size(inflight): %d\n", space(inflight), size(inflight)); */
 
     int ncomps = 0;
 #ifndef NO_NIC_DEBUG
